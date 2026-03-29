@@ -13,7 +13,6 @@ async function aiCommand(sock, chatId, message) {
             });
         }
 
-        // Get the command and query
         const parts = text.split(' ');
         const command = parts[0].toLowerCase();
         const query = parts.slice(1).join(' ').trim();
@@ -21,61 +20,101 @@ async function aiCommand(sock, chatId, message) {
         if (!query) {
             return await sock.sendMessage(chatId, { 
                 text: "Please provide a question after .gpt or .gemini"
-            }, {quoted:message});
+            }, { quoted: message });
         }
 
         try {
-            // Show processing message
             await sock.sendMessage(chatId, {
                 react: { text: '🤖', key: message.key }
             });
 
             if (command === '.gpt') {
-                // Call the GPT API
-                const response = await axios.get(`https://zellapi.autos/ai/chatbot?text=${encodeURIComponent(query)}`);
-                
-                if (response.data && response.data.status && response.data.result) {
-                    const answer = response.data.result;
-                    await sock.sendMessage(chatId, {
-                        text: answer
-                    }, {
-                        quoted: message
-                    });
-                    
-                } else {
-                    throw new Error('Invalid response from API');
-                }
-            } else if (command === '.gemini') {
-                const apis = [
-                    `https://vapis.my.id/api/gemini?q=${encodeURIComponent(query)}`,
-                    `https://api.siputzx.my.id/api/ai/gemini-pro?content=${encodeURIComponent(query)}`,
-                    `https://api.ryzendesu.vip/api/ai/gemini?text=${encodeURIComponent(query)}`,
+
+                // ===== Fallback Free API list for .gpt =====
+                const gptAPIs = [
+                    `https://api-amine.vercel.app/api/chat?prompt=${encodeURIComponent(query)}`,
+                    `https://r-gengpt-api.vercel.app/api/chat?prompt=${encodeURIComponent(query)}`,
                     `https://zellapi.autos/ai/chatbot?text=${encodeURIComponent(query)}`,
-                    `https://api.giftedtech.my.id/api/ai/geminiai?apikey=gifted&q=${encodeURIComponent(query)}`,
-                    `https://api.giftedtech.my.id/api/ai/geminiaipro?apikey=gifted&q=${encodeURIComponent(query)}`
+                    `https://vapis.my.id/api/gpt?text=${encodeURIComponent(query)}`,
+                    `https://api.siputzx.my.id/api/ai/gpt?text=${encodeURIComponent(query)}`
                 ];
 
-                for (const api of apis) {
+                let success = false;
+                for (const apiUrl of gptAPIs) {
                     try {
-                        const response = await fetch(api);
-                        const data = await response.json();
+                        const res = await axios.get(apiUrl);
+                        const data = res.data;
 
-                        if (data.message || data.data || data.answer || data.result) {
-                            const answer = data.message || data.data || data.answer || data.result;
+                        const answer =
+                            data.result ||
+                            data.answer ||
+                            data.data ||
+                            data.reply ||
+                            data.response;
+
+                        if (answer) {
                             await sock.sendMessage(chatId, {
                                 text: answer
                             }, {
                                 quoted: message
                             });
-                            
-                            return;
+                            success = true;
+                            break;
                         }
                     } catch (e) {
                         continue;
                     }
                 }
-                throw new Error('All Gemini APIs failed');
+
+                if (!success) {
+                    throw new Error('All GPT APIs failed');
+                }
+
+            } else if (command === '.gemini') {
+
+                // ===== Fallback Free API list for .gemini =====
+                const geminiAPIs = [
+                    `https://vapis.my.id/api/gemini?q=${encodeURIComponent(query)}`,
+                    `https://api.siputzx.my.id/api/ai/gemini-pro?content=${encodeURIComponent(query)}`,
+                    `https://api.ryzendesu.vip/api/ai/gemini?text=${encodeURIComponent(query)}`,
+                    `https://zellapi.autos/ai/chatbot?text=${encodeURIComponent(query)}`, 
+                    `https://r-gengpt-api.vercel.app/api/chat?prompt=${encodeURIComponent(query)}`, 
+                    `https://api-amine.vercel.app/api/chat?prompt=${encodeURIComponent(query)}`
+                ];
+
+                let done = false;
+                for (const apiUrl of geminiAPIs) {
+                    try {
+                        const response = await fetch(apiUrl);
+                        const json = await response.json();
+
+                        const answer =
+                            json.message ||
+                            json.data ||
+                            json.answer ||
+                            json.result ||
+                            json.reply;
+
+                        if (answer) {
+                            await sock.sendMessage(chatId, {
+                                text: answer
+                            }, {
+                                quoted: message
+                            });
+                            done = true;
+                            break;
+                        }
+                    } catch (e) {
+                        continue;
+                    }
+                }
+
+                if (!done) {
+                    throw new Error('All Gemini APIs failed');
+                }
+
             }
+
         } catch (error) {
             console.error('API Error:', error);
             await sock.sendMessage(chatId, {
@@ -88,6 +127,7 @@ async function aiCommand(sock, chatId, message) {
                 quoted: message
             });
         }
+
     } catch (error) {
         console.error('AI Command Error:', error);
         await sock.sendMessage(chatId, {
@@ -102,4 +142,4 @@ async function aiCommand(sock, chatId, message) {
     }
 }
 
-module.exports = aiCommand; 
+module.exports = aiCommand;
